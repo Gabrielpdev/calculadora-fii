@@ -81,6 +81,10 @@ export default function Home() {
         setData([]);
         setShowedData({});
         setDateOptions([]);
+
+        setJson(null);
+        setShowFileInput(false);
+        fileRef.current!.value = "";
       } else {
         console.error("Failed to convert to JSON");
       }

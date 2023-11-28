@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import path from "path";
 
-const dataFilePath = path.join(process.cwd(), "db/userData.json");
+const dataFilePath = path.join(process.cwd(), "src/db/userData.json");
 
 export async function GET() {
   try {
