@@ -20,8 +20,6 @@ export async function POST(req: Request) {
 
     const jsonBody: IData[] = await req.json();
 
-    // console.log("jsonBody", jsonBody);
-
     const formattedData = jsonBody.map((item) => ({
       ...item,
       "Média da compra": addAverageScore(jsonBody, item["Produto"]),
@@ -29,7 +27,6 @@ export async function POST(req: Request) {
 
     const newData = [...objectData, ...formattedData];
 
-    // console.log("newData", newData);
     const updatedData = JSON.stringify(newData);
 
     const data = new Uint8Array(Buffer.from(updatedData));
