@@ -1,18 +1,25 @@
 "use client";
-import { months } from "@/constants/months";
-import { IData, IShowedData } from "@/types/data";
-import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useEffect, useState, useRef, useContext, useCallback } from "react";
+
 import { read, utils } from "xlsx";
 import { v4 } from "uuid";
-import Link from "next/link";
+
+import { months } from "@/constants/months";
+import { IData, IShowedData } from "@/types/data";
+
+import { UserContext } from "@/providers/firebase";
+import { sendData } from "@/service/sendData";
+import { getData } from "@/service/getData";
+import { deleteData } from "@/service/deleteData";
+import { Loading } from "@/components/loading";
 
 export default function Home() {
-  const passwordRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [file, setJson] = useState<any>(null);
+  const { user } = useContext(UserContext);
 
-  const [passwordResponse, setPasswordResponse] = useState(false);
+  const [file, setJson] = useState<any>(null);
 
   const [showFileInput, setShowFileInput] = useState(false);
 
@@ -20,7 +27,9 @@ export default function Home() {
   const [showedData, setShowedData] = useState<IShowedData>({});
   const [dateOptions, setDateOptions] = useState<any>([]);
 
-  const handleFileChange = (e: any) => {
+  const [loading, setLoading] = useState(true);
+
+  const handleFileChange = useCallback((e: any) => {
     e.preventDefault();
 
     if (e.target.files) {
@@ -40,27 +49,25 @@ export default function Home() {
       };
       reader.readAsArrayBuffer(e.target.files[0]);
     }
-  };
+  }, []);
 
   const handleSaveJSON = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/insert", {
-        method: "POST",
-        body: JSON.stringify(file),
-      });
+      const token = await user?.getIdToken(true);
+      if (!token) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        setData(data);
-        removeCreditDatas(data);
-        setJson(null);
-        setShowFileInput(false);
-        fileRef.current!.value = "";
-      } else {
-        console.error("Failed to convert to JSON");
-      }
+      const data = await sendData(file, token);
+
+      setData(data);
+      removeCreditDatas(data);
+      setJson(null);
+      setShowFileInput(false);
+      fileRef.current!.value = "";
     } catch (error) {
       console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,72 +76,45 @@ export default function Home() {
 
     if (!confirm) return;
 
+    setLoading(true);
     try {
-      const response = await fetch("/api/delete", {
-        method: "DELETE",
-      });
+      const token = await user?.getIdToken(true);
+      if (!token) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        alert(data.message);
+      await deleteData(token);
 
-        setData([]);
-        setShowedData({});
-        setDateOptions([]);
+      alert("Dados deletados com sucesso");
 
-        setJson(null);
-        setShowFileInput(false);
-        fileRef.current!.value = "";
-      } else {
-        console.error("Failed to convert to JSON");
-      }
+      setData([]);
+      setShowedData({});
+      setDateOptions([]);
+
+      setJson(null);
+      setShowFileInput(false);
+      fileRef.current!.value = "";
     } catch (error) {
       console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const readJsonFile = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/select");
+      const token = await user?.getIdToken(true);
+      if (!token) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        setData(data);
-        removeCreditDatas(data);
-      } else {
-        console.error("Failed to select JSON");
-      }
+      const data = await getData(token);
+
+      if (!data) return;
+
+      setData(data);
+      removeCreditDatas(data);
     } catch (error) {
       console.error("Error:", error);
-    }
-  };
-
-  const readDataFromLocal = async () => {
-    const response = localStorage.getItem(
-      process.env.NEXT_PUBLIC_LOCAL_KEY as string
-    );
-
-    setPasswordResponse(response === "Success");
-  };
-
-  const handleCheckPassword = async () => {
-    try {
-      const response = await fetch("/api/checkPassword", {
-        method: "POST",
-        body: JSON.stringify({ password: passwordRef.current?.value }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem(
-          process.env.NEXT_PUBLIC_LOCAL_KEY as string,
-          data.message
-        );
-
-        readDataFromLocal();
-      }
-    } catch (error) {
-      console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -196,20 +176,8 @@ export default function Home() {
   };
 
   useEffect(() => {
-    readDataFromLocal();
     readJsonFile();
   }, []);
-
-  if (!passwordResponse) {
-    return (
-      <>
-        <input className="text-black" ref={passwordRef} type="password" />
-        <button type="button" onClick={handleCheckPassword}>
-          Login
-        </button>
-      </>
-    );
-  }
 
   return (
     <div>
@@ -312,143 +280,151 @@ export default function Home() {
         </div>
       </div>
 
-      {Object.entries(showedData)?.map(([key, month]) => {
-        const totalLucro = month.reduce((acc, item) => {
-          const lucro =
-            (item["Preço unitário"] - item["Média da compra"]) *
-            item["Quantidade"];
+      {loading ? (
+        <div className="w-full h-60 flex items-center justify-center">
+          <Loading />
+        </div>
+      ) : (
+        Object.entries(showedData)?.map(([key, month]) => {
+          const totalLucro = month.reduce((acc, item) => {
+            const lucro =
+              (item["Preço unitário"] - item["Média da compra"]) *
+              item["Quantidade"];
 
-          return acc + lucro;
-        }, 0);
+            return acc + lucro;
+          }, 0);
 
-        return (
-          <div key={v4()}>
-            <div className="flex items-center justify-center border-b-2 max-sm:sticky top-0 left-0 bg-black">
-              <h2 className="text-4xl text-center max-sm:text-3xl max-sm:my-4">
-                {key}
-              </h2>
-              <div className="flex text-3xl text-center ml-2 max-sm:text-base">
-                (
-                <h3
-                  className={`${
-                    totalLucro < 0 ? "text-red-400" : "text-green-400"
-                  } `}
-                >
-                  {totalLucro.toFixed(2)}
-                </h3>
-                )
-              </div>
-            </div>
-
-            {month.map((item) => {
-              const lucro =
-                (item["Preço unitário"] - item["Média da compra"]) *
-                item["Quantidade"];
-
-              return (
-                <div
-                  className="grid grid-cols-11 text-center border-b border-dashed border-gray-700 last-of-type:border-solid last-of-type:border-b-2 last-of-type:border-white max-sm:grid-cols-5 max-sm:text-xs max-sm:border-white max-sm:border-solid max-sm:even:bg-zinc-500 max-sm:odd:bg-zinc-800 max-sm:border-y-2"
-                  key={v4()}
-                >
-                  <div className="flex items-center justify-between flex-col ">
-                    <span className="w-full hidden max-sm:flex max-sm:items-center max-sm:justify-center max-sm:border-b max-sm:border-r max-sm:border-t break-words p-1 max-sm:h-14 max-sm:bg-black/40">
-                      Entrada / Saída
-                    </span>
-                    <span className="w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:p-5 max-sm:h-14">
-                      {item["Entrada/Saída"]}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Data
-                    </span>
-                    <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                      {item["Data"]}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col col-span-4  max-sm:col-span-3">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t items-center justify-center border-r-2 col-span-4 max-sm:col-span-3 max-sm:h-14 max-sm:bg-black/40">
-                      Produto
-                    </span>
-                    <span className="w-full flex items-center justify-center col-span-4 text-left pl-1 border-white border-solid border-r-2 max-sm:col-span-3 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                      {item["Produto"]}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Quantidade
-                    </span>
-                    <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                      {item["Quantidade"]}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Preço unitário
-                    </span>
-                    <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                      {item["Preço unitário"]}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Preço médio da compra
-                    </span>
-                    <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                      {item["Média da compra"].toFixed(2)}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Lucro
-                    </span>
-                    <span
-                      className={`w-full border-r-2 flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
-                        lucro < 0 ? "text-red-400" : "text-green-400"
-                      }`}
-                    >
-                      {lucro.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {/* ============================================================================================================================================================================================== */}
-
-                  <div className="flex items-center justify-between flex-col border border-dashed border-gray-700">
-                    <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                      Imposto (20%)
-                    </span>
-                    <span
-                      className={`w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
-                        lucro < 0 ? "text-red-400" : "text-green-400"
-                      }`}
-                    >
-                      {(lucro * 0.2).toFixed(2)}
-                    </span>
-                  </div>
+          return (
+            <div key={v4()}>
+              <div className="flex items-center justify-center border-b-2 max-sm:sticky top-0 left-0 bg-black">
+                <h2 className="text-4xl text-center max-sm:text-3xl max-sm:my-4">
+                  {key}
+                </h2>
+                <div className="flex text-3xl text-center ml-2 max-sm:text-base">
+                  (
+                  <h3
+                    className={`${
+                      totalLucro < 0 ? "text-red-400" : "text-green-400"
+                    } `}
+                  >
+                    {totalLucro.toFixed(2)}
+                  </h3>
+                  )
                 </div>
-              );
-            })}
-          </div>
-        );
-      })}
+              </div>
+
+              {month.map((item) => {
+                const lucro =
+                  (item["Preço unitário"] - item["Média da compra"]) *
+                  item["Quantidade"];
+
+                return (
+                  <div
+                    className="grid grid-cols-11 text-center border-b border-dashed border-gray-700 
+                  last-of-type:border-solid last-of-type:border-b-2 last-of-type:border-white
+                  max-sm:grid-cols-6 max-sm:text-xs max-sm:border-white max-sm:border-solid max-sm:even:bg-zinc-500 max-sm:odd:bg-zinc-800 max-sm:border-y-2"
+                    key={v4()}
+                  >
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-1">
+                      <span className="w-full hidden max-sm:flex max-sm:items-center max-sm:justify-center max-sm:border-b max-sm:border-r max-sm:border-t break-words p-1 max-sm:h-14 max-sm:bg-black/40">
+                        Entrada / Saída
+                      </span>
+                      <span className="w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:p-5 max-sm:h-14">
+                        {item["Entrada/Saída"]}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Data
+                      </span>
+                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
+                        {item["Data"]}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col col-span-4 max-sm:col-span-6 max-sm:-order-1">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t items-center justify-center border-r-2 col-span-4 max-sm:col-span-3 max-sm:h-14 max-sm:bg-black/40">
+                        Produto
+                      </span>
+                      <span className="w-full flex items-center justify-center col-span-4 text-left pl-1 border-white border-solid border-r-2 max-sm:col-span-3 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
+                        {item["Produto"]}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Quantidade
+                      </span>
+                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
+                        {item["Quantidade"]}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-1">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Preço unitário
+                      </span>
+                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
+                        {item["Preço unitário"]}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Preço médio da compra
+                      </span>
+                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
+                        {item["Média da compra"].toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Lucro
+                      </span>
+                      <span
+                        className={`w-full border-r-2 flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
+                          lucro < 0 ? "text-red-400" : "text-green-400"
+                        }`}
+                      >
+                        {lucro.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* ============================================================================================================================================================================================== */}
+
+                    <div className="flex items-center justify-between flex-col border border-dashed border-gray-700 max-sm:col-span-2">
+                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
+                        Imposto (20%)
+                      </span>
+                      <span
+                        className={`w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
+                          lucro < 0 ? "text-red-400" : "text-green-400"
+                        }`}
+                      >
+                        {(lucro * 0.2).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

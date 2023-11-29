@@ -1,43 +1,40 @@
-// pages/api/convertToJSON.js
-
 import { IData, IUpdateData } from "@/types/data";
 import { isBefore, isEqual } from "date-fns";
-import { readFileSync, writeFile } from "fs";
-import path from "path";
 
-const dataFilePath = path.join(process.cwd(), "src/db/userData.json");
-
-export async function POST(req: Request) {
-  if (req.method !== "POST") {
-    return new Response("Method Not Allowed", {
-      status: 405,
-    });
-  }
-
+export async function updateData(jsonBody: IUpdateData, token: string) {
   try {
-    const bufferDataString = readFileSync(dataFilePath, { encoding: "utf8" });
+    const dataListRes = await fetch(
+      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`
+    );
 
-    const objectData = JSON.parse(bufferDataString || "[]");
+    const { data: dataList } = await dataListRes.json();
 
-    const jsonBody: IUpdateData = await req.json();
+    const objectData: IData[] = JSON.parse(dataList);
 
     const formattedData = formatData(objectData, jsonBody);
 
     const updatedData = JSON.stringify(formattedData);
 
-    const data = new Uint8Array(Buffer.from(updatedData));
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          data: updatedData,
+        }),
+      }
+    );
 
-    writeFile(dataFilePath, data, "utf8", (err) => {
-      if (err) throw err;
-      console.log("The file has been updated!");
-    });
+    const { data } = await response.json();
 
-    return new Response(updatedData);
+    const parsedData = JSON.parse(data || "[]");
+
+    console.log(parsedData);
+
+    return parsedData;
   } catch (error) {
     console.error(error);
-    return new Response("Internal Server Error", {
-      status: 500,
-    });
+    return;
   }
 }
 

@@ -19,3 +19,7 @@ export interface IUpdateData {
   product: string;
   divided: number;
 }
+
+export interface IUserContext {
+  user: any;
+}
