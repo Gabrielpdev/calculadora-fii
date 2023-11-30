@@ -18,7 +18,6 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_MEASUREMENT_ID,
-  databaseURL: process.env.NEXT_PUBLIC_DATABASE_URL,
 };
 
 export const app = initializeApp(firebaseConfig);
@@ -45,8 +44,7 @@ export default function FirebaseProvider({
   const logout = async () => {
     const auth = getAuth();
 
-    const userCred = await signOut(auth);
-    console.log(userCred);
+    await signOut(auth);
   };
 
   useEffect(() => {

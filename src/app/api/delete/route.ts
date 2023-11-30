@@ -1,7 +1,12 @@
-export async function deleteData(token: string) {
+import { revalidateTag } from "next/cache";
+
+export async function DELETE(request: Request) {
+  const token = request.headers.get("authorization");
+
   try {
+    revalidateTag("list");
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`,
+      `${process.env.DATABASE_URL}/list.json?auth=${token}`,
       {
         method: "PUT",
         body: JSON.stringify({
@@ -12,12 +17,11 @@ export async function deleteData(token: string) {
 
     const { data } = await response.json();
 
-    console.log(data);
-
     const parsedData = JSON.parse(data || "[]");
 
-    console.log(parsedData);
-    return parsedData;
+    return Response.json({
+      data: parsedData,
+    });
   } catch (error) {
     console.error(error);
     return;

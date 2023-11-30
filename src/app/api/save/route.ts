@@ -1,7 +1,12 @@
 import { IData } from "@/types/data";
+import { revalidateTag } from "next/cache";
 
-export async function sendData(jsonBody: IData[], token: string) {
+export async function POST(request: Request) {
+  const token = request.headers.get("authorization");
+  const jsonBody: IData[] = await request.json();
+
   try {
+    revalidateTag("list");
     const formattedData = jsonBody.map((item) => ({
       ...item,
       "Média da compra": addAverageScore(jsonBody, item["Produto"]),
@@ -10,7 +15,7 @@ export async function sendData(jsonBody: IData[], token: string) {
     const updatedData = JSON.stringify(formattedData);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`,
+      `${process.env.DATABASE_URL}/list.json?auth=${token}`,
       {
         method: "PUT",
         body: JSON.stringify({
@@ -23,7 +28,9 @@ export async function sendData(jsonBody: IData[], token: string) {
 
     const parsedData = JSON.parse(data || "[]");
 
-    return parsedData;
+    return Response.json({
+      data: parsedData,
+    });
   } catch (error) {
     console.error(error);
     return;

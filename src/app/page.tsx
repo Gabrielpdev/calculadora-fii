@@ -9,9 +9,6 @@ import { months } from "@/constants/months";
 import { IData, IShowedData } from "@/types/data";
 
 import { UserContext } from "@/providers/firebase";
-import { sendData } from "@/service/sendData";
-import { getData } from "@/service/getData";
-import { deleteData } from "@/service/deleteData";
 import { Loading } from "@/components/loading";
 
 export default function Home() {
@@ -54,10 +51,21 @@ export default function Home() {
   const handleSaveJSON = async () => {
     setLoading(true);
     try {
-      const token = await user?.getIdToken(true);
+      const token = await user?.getIdToken();
       if (!token) return;
 
-      const data = await sendData(file, token);
+      const response = await fetch(`/api/save`, {
+        method: "POST",
+        body: JSON.stringify(file),
+        headers: {
+          Authorization: `${token}`,
+        },
+        credentials: "include",
+      });
+
+      const { data } = await response.json();
+
+      if (!data) return;
 
       setData(data);
       removeCreditDatas(data);
@@ -78,10 +86,18 @@ export default function Home() {
 
     setLoading(true);
     try {
-      const token = await user?.getIdToken(true);
+      const token = await user?.getIdToken();
       if (!token) return;
 
-      await deleteData(token);
+      const response = await fetch(`/api/delete`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `${token}`,
+        },
+        credentials: "include",
+      });
+
+      await response.json();
 
       alert("Dados deletados com sucesso");
 
@@ -102,10 +118,18 @@ export default function Home() {
   const readJsonFile = async () => {
     setLoading(true);
     try {
-      const token = await user?.getIdToken(true);
+      console.log(user);
+      const token = await user?.getIdToken();
       if (!token) return;
 
-      const data = await getData(token);
+      const response = await fetch(`/api/list`, {
+        headers: {
+          Authorization: `${token}`,
+        },
+        credentials: "include",
+      });
+
+      const { data } = await response.json();
 
       if (!data) return;
 
@@ -374,7 +398,7 @@ export default function Home() {
                         Preço unitário
                       </span>
                       <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Preço unitário"]}
+                        {item["Preço unitário"].toFixed(2)}
                       </span>
                     </div>
 

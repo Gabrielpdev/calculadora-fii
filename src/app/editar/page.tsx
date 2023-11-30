@@ -5,9 +5,7 @@ import { useEffect, useState, useRef, useContext } from "react";
 import { v4 } from "uuid";
 import Link from "next/link";
 import { isBefore, isEqual } from "date-fns";
-import { getData } from "@/service/getData";
 import { UserContext } from "@/providers/firebase";
-import { updateData } from "@/service/updateData";
 import { Loading } from "@/components/loading";
 
 export default function Editar() {
@@ -31,11 +29,17 @@ export default function Editar() {
   const readJsonFile = async () => {
     setLoading(true);
     try {
-      const token = await user?.getIdToken(true);
-
+      const token = await user?.getIdToken();
       if (!token) return;
 
-      const data = await getData(token);
+      const response = await fetch(`/api/list`, {
+        headers: {
+          Authorization: `${token}`,
+        },
+        credentials: "include",
+      });
+
+      const { data } = await response.json();
 
       if (!data) return;
 
@@ -155,26 +159,30 @@ export default function Editar() {
       return;
     }
 
-    setLoading(true);
-
     if (productsSelected === "Todos") {
       alert("Selecione um produto");
       return;
     }
 
+    setLoading(true);
     try {
-      const token = await user?.getIdToken(true);
+      const token = await user?.getIdToken();
 
       if (!token) return;
 
-      const data = await updateData(
-        {
+      const response = await fetch(`/api/update`, {
+        method: "PUT",
+        body: JSON.stringify({
           date: dateSelected,
           product: productsSelected,
           divided: Number(inputRef.current?.value) || 1,
+        }),
+        headers: {
+          Authorization: `${token}`,
         },
-        token
-      );
+      });
+
+      const { data } = await response.json();
 
       setProductsSelected("Todos");
       setDateSelected("Todos");
@@ -183,6 +191,8 @@ export default function Editar() {
 
       const grouped = groupByMonths(data);
       setShowedData(grouped);
+
+      inputRef.current.value = "";
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -197,6 +207,8 @@ export default function Editar() {
   useEffect(() => {
     readJsonFile();
   }, []);
+
+  console.log({ showedData });
 
   return (
     <div>
@@ -311,6 +323,10 @@ export default function Editar() {
         <div className="w-full h-60 flex items-center justify-center">
           <Loading />
         </div>
+      ) : Object.entries(showedData).length === 0 ? (
+        <div className="w-full h-60 flex items-center justify-center">
+          <h2>Nenhum FII disponivel</h2>
+        </div>
       ) : (
         Object.entries(showedData)?.map(([key, month]) => (
           <div key={v4()}>
@@ -398,7 +414,7 @@ export default function Editar() {
                         : "text-red-400"
                     }`}
                   >
-                    {item["Preço unitário"]}
+                    {item["Preço unitário"].toFixed(2)}
                   </span>
                 </div>
 
@@ -413,7 +429,7 @@ export default function Editar() {
                         : "text-red-400"
                     }`}
                   >
-                    {item["Valor da Operação"]}
+                    {item["Valor da Operação"].toFixed(2)}
                   </span>
                 </div>
               </div>

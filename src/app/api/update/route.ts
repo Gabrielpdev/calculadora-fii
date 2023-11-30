@@ -1,22 +1,29 @@
 import { IData, IUpdateData } from "@/types/data";
 import { isBefore, isEqual } from "date-fns";
+import { revalidateTag } from "next/cache";
 
-export async function updateData(jsonBody: IUpdateData, token: string) {
+export async function PUT(request: Request) {
+  const token = request.headers.get("authorization");
+  const jsonBody: IUpdateData = await request.json();
+
+  const host = request.url.split("/api/update")[0];
+
   try {
-    const dataListRes = await fetch(
-      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`
-    );
+    revalidateTag("list");
+    const dataListRes = await fetch(`${host}/api/list`, {
+      headers: {
+        Authorization: `${token}`,
+      },
+    });
 
-    const { data: dataList } = await dataListRes.json();
+    const { data: dataList }: { data: IData[] } = await dataListRes.json();
 
-    const objectData: IData[] = JSON.parse(dataList);
-
-    const formattedData = formatData(objectData, jsonBody);
+    const formattedData = formatData(dataList, jsonBody);
 
     const updatedData = JSON.stringify(formattedData);
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_DATABASE_URL}/list.json?auth=${token}`,
+      `${process.env.DATABASE_URL}/list.json?auth=${token}`,
       {
         method: "PUT",
         body: JSON.stringify({
@@ -29,9 +36,9 @@ export async function updateData(jsonBody: IUpdateData, token: string) {
 
     const parsedData = JSON.parse(data || "[]");
 
-    console.log(parsedData);
-
-    return parsedData;
+    return Response.json({
+      data: parsedData,
+    });
   } catch (error) {
     console.error(error);
     return;
