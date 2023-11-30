@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const response = await fetch(
       `${process.env.DATABASE_URL}/list.json?auth=${token}`,
       {
-        next: { revalidate: 60 * 10, tags: ["list"] }, // Revalidate every 10 minutes
+        next: { revalidate: Infinity, tags: ["list"] },
       }
     );
 
