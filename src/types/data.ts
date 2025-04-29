@@ -1,13 +1,10 @@
 export interface IData {
   Data: string;
-  ["Entrada/Saída"]: "Debito" | "Credito";
-  Instituição: string;
-  Movimentação: string;
-  ["Média da compra"]: number;
-  ["Preço unitário"]: number;
-  Produto: string;
-  Quantidade: number;
-  ["Valor da Operação"]: number;
+  Estabelecimento: string;
+  Parcela: string;
+  Portador: string;
+  Valor: string;
+  Tipo: string;
 }
 
 export interface IShowedData {

@@ -10,17 +10,17 @@ import {
 } from "firebase/auth";
 import { IUserContext } from "@/types/data";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_MEASUREMENT_ID,
-};
+// const firebaseConfig = {
+//   apiKey: process.env.NEXT_PUBLIC_API_KEY,
+//   authDomain: process.env.NEXT_PUBLIC_AUTH_DOMAIN,
+//   projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
+//   storageBucket: process.env.NEXT_PUBLIC_STORAGE_BUCKET,
+//   messagingSenderId: process.env.NEXT_PUBLIC_MESSAGING_SENDER_ID,
+//   appId: process.env.NEXT_PUBLIC_APP_ID,
+//   measurementId: process.env.NEXT_PUBLIC_MEASUREMENT_ID,
+// };
 
-export const app = initializeApp(firebaseConfig);
+// export const app = initializeApp(firebaseConfig);
 
 export const UserContext = createContext({} as IUserContext);
 
@@ -47,30 +47,30 @@ export default function FirebaseProvider({
     await signOut(auth);
   };
 
-  useEffect(() => {
-    const auth = getAuth(app);
-    auth.onAuthStateChanged(async (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-  }, []);
+  // useEffect(() => {
+  //   // const auth = getAuth(app);
+  //   // auth.onAuthStateChanged(async (user) => {
+  //   //   setUser(user);
+  //   //   setLoading(false);
+  //   // });
+  // }, []);
 
-  if (!user) {
-    return <button onClick={login}>LOGIN</button>;
-  }
+  // if (!user) {
+  //   return <button onClick={login}>LOGIN</button>;
+  // }
 
-  if (loading) {
-    return <h1>Loading user</h1>;
-  }
+  // if (loading) {
+  //   return <h1>Loading user</h1>;
+  // }
 
-  if (user.email !== process.env.NEXT_PUBLIC_USER_EMAIL) {
-    return (
-      <>
-        <h1>User not allowed</h1>
-        <button onClick={logout}>LOGOUT</button>
-      </>
-    );
-  }
+  // if (user.email !== process.env.NEXT_PUBLIC_USER_EMAIL) {
+  //   return (
+  //     <>
+  //       <h1>User not allowed</h1>
+  //       <button onClick={logout}>LOGOUT</button>
+  //     </>
+  //   );
+  // }
 
   return (
     <UserContext.Provider

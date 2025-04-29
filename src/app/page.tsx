@@ -1,8 +1,6 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState, useRef, useContext, useCallback } from "react";
 
-import { read, utils } from "xlsx";
 import { v4 } from "uuid";
 
 import { months } from "@/constants/months";
@@ -10,6 +8,9 @@ import { IData, IShowedData } from "@/types/data";
 
 import { UserContext } from "@/providers/firebase";
 import { Loading } from "@/components/loading";
+import { formatToDate } from "@/utils/formatToDate";
+
+const header = ["Data", "Estabelecimento", "Valor", "Parcela"];
 
 export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -30,23 +31,69 @@ export default function Home() {
     e.preventDefault();
 
     if (e.target.files) {
-      const reader = new FileReader();
-      reader.onload = (e: any) => {
-        const data = e.target.result;
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const content = e?.target?.result as string;
+          const json = csvJSON(content) as IData[];
 
-        const workbook = read(data, { type: "array" });
-
-        const sheetName = workbook.SheetNames[0];
-
-        const worksheet = workbook.Sheets[sheetName];
-
-        const json = utils.sheet_to_json(worksheet);
-
-        setJson(json);
-      };
-      reader.readAsArrayBuffer(e.target.files[0]);
+          setJson(json);
+          setData(json);
+        };
+        reader.readAsText(file);
+        console.log(reader);
+      }
     }
+
+    // if (e.target.files) {
+    //   const reader = new FileReader();
+    //   reader.onload = (e: any) => {
+    //     const data = e.target.result;
+
+    //     const workbook = read(data, { type: "array" });
+
+    //     const sheetName = workbook.SheetNames[0];
+
+    //     const worksheet = workbook.Sheets[sheetName];
+
+    //     const json = utils.sheet_to_json(worksheet);
+
+    //     console.log({ json });
+    //   };
+    //   reader.readAsArrayBuffer(e.target.files[0]);
+    // }
   }, []);
+
+  function csvJSON(csv?: string) {
+    if (!csv) return console.error("CSV is empty");
+
+    const isNu = csv.includes("Data,Valor,Identificador,Descrição");
+    const lines = csv.split(isNu ? "\n" : "\r\n");
+
+    const result = [];
+
+    const headers = lines[0].split(isNu ? "," : ";");
+
+    const formattedHeaders = headers.map((item) => {
+      if (item === "Descrição") return "Estabelecimento";
+      return item;
+    });
+
+    for (var i = 1; i < lines.length; i++) {
+      var obj = {} as any;
+      var currentLine = lines[i].split(isNu ? "," : ";");
+
+      for (var j = 0; j < formattedHeaders.length; j++) {
+        obj[formattedHeaders[j]] = currentLine[j];
+      }
+      obj["Tipo"] = isNu ? "Nubank" : "Xp";
+
+      result.push(obj);
+    }
+
+    return result;
+  }
 
   const handleSaveJSON = async () => {
     setLoading(true);
@@ -118,22 +165,21 @@ export default function Home() {
   const readJsonFile = async () => {
     setLoading(true);
     try {
-      console.log(user);
-      const token = await user?.getIdToken();
-      if (!token) return;
+      // const token = await user?.getIdToken();
+      // if (!token) return;
 
-      const response = await fetch(`/api/list`, {
-        headers: {
-          Authorization: `${token}`,
-        },
-        credentials: "include",
-      });
+      // const response = await fetch(`/api/list`, {
+      //   headers: {
+      //     Authorization: `${token}`,
+      //   },
+      //   credentials: "include",
+      // });
 
-      const { data } = await response.json();
+      // const { data } = await response.json();
 
-      if (!data) return;
+      // if (!data) return;
 
-      setData(data);
+      // setData(data);
       removeCreditDatas(data);
     } catch (error) {
       console.error("Error:", error);
@@ -144,18 +190,20 @@ export default function Home() {
 
   const removeCreditDatas = async (data: IData[]) => {
     try {
-      const filteredData = data.filter(
-        (item: any) => item["Entrada/Saída"] !== "Credito"
-      );
-
       const uniqueMap = new Map();
-      filteredData.forEach((obj) => uniqueMap.set(obj["Data"], obj["Data"]));
+      data.forEach((obj) => {
+        const date = formatToDate(obj);
+
+        const monthKey = `${months[date.getMonth()]}-${date.getFullYear()}`;
+
+        uniqueMap.set(monthKey, monthKey);
+      });
 
       const uniqueArray = Array.from(uniqueMap.values());
 
       setDateOptions(uniqueArray);
 
-      const grouped = groupByMonths(filteredData);
+      const grouped = groupByMonths(data);
       setShowedData(grouped);
     } catch (error) {
       console.error("Error:", error);
@@ -164,11 +212,9 @@ export default function Home() {
 
   const groupByMonths = (data: IData[]) => {
     return data.reduce((acc, obj) => {
-      const splinedDate = obj["Data"].split("/");
+      if (!obj["Data"]) return acc;
 
-      const date = new Date(
-        `${splinedDate[1]}-${splinedDate[0]}-${splinedDate[2]}`
-      );
+      const date = formatToDate(obj);
 
       const monthKey = `${months[date.getMonth()]}-${date.getFullYear()}`;
 
@@ -180,9 +226,7 @@ export default function Home() {
   };
 
   const onSelectChange = (e: any) => {
-    const filteredData = data.filter(
-      (item: any) => item["Entrada/Saída"] !== "Credito"
-    );
+    const filteredData = data;
 
     if (e.target.value === "Todos") {
       const grouped = groupByMonths(filteredData);
@@ -191,17 +235,72 @@ export default function Home() {
       return;
     }
 
-    const dataToSelect = filteredData.filter(
-      (item: any) => item["Data"] === e.target.value
-    );
+    const dataToSelect = filteredData.filter((item: any) => {
+      const date = formatToDate(item);
+      const monthKey = `${months[date.getMonth()]}-${date.getFullYear()}`;
+
+      return monthKey === e.target.value;
+    });
 
     const grouped = groupByMonths(dataToSelect);
     setShowedData(grouped);
   };
 
+  const formatValue = (value: string, type: string, banco: string) => {
+    if (!value) return value;
+
+    if (type === "Estabelecimento") {
+      if (value.includes("Transferência"))
+        return value
+          .replace(/^((?:[^-]*-){1}[^-]*)-.*$/, "$1")
+          .replace(/^[^-]*recebida[^-]*-/, "PIX de") // Replace "recebida" with "PIX de"
+          .replace(/^[^-]*enviada[^-]*-/i, "PIX para") // Replace "enviada" with "PIX para"
+          .trim();
+
+      if (value.includes("Pagamento de boleto"))
+        return value.replace(/-.*$/, "").trim();
+    }
+
+    if (type === "Valor") {
+      const valueNumber =
+        banco === "Nubank"
+          ? Number(value.replace("R$ ", ""))
+          : Number(
+              value.replace("R$ ", "").replace(".", "").replace(",", ".")
+            ) * -1;
+
+      return valueNumber.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+    }
+
+    return value;
+  };
+
+  const getColor = (value: string, type: string, banco: string) => {
+    if (type === "Valor") {
+      const valueNumber =
+        banco === "Nubank"
+          ? Number(value.replace("R$ ", ""))
+          : Number(value.replace("R$ ", "").replace(".", "").replace(",", "."));
+
+      if (banco === "Nubank") {
+        if (valueNumber > 0) return "text-green-500";
+        if (valueNumber < 0) return "text-red-500";
+      }
+
+      if (valueNumber < 0) return "text-green-500";
+
+      return "text-red-500";
+    }
+  };
+
   useEffect(() => {
     readJsonFile();
   }, []);
+
+  console.log({ showedData, data });
 
   return (
     <div>
@@ -217,7 +316,7 @@ export default function Home() {
           <>
             <input
               type="file"
-              accept=".xlsx"
+              accept=".csv"
               onChange={handleFileChange}
               ref={fileRef}
             />
@@ -259,48 +358,21 @@ export default function Home() {
           >
             Deletar
           </button>
-          <Link
-            className="w-60 text-center rounded bg-orange-300 text-black p-2 br-2 hover:bg-orange-200 max-sm:w-full"
-            href="/editar"
-          >
-            Visualizar todos os dados
-          </Link>
         </div>
       </div>
 
       <div className="bg-slate-800 sticky top-0 left-0 right-0 border max-sm:hidden ">
-        <div className="grid grid-cols-11 text-center max-sm:grid-cols-5 max-sm:text-xs">
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Entrada/Saída
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Data
-          </span>
-          <span className="flex items-center justify-center border-r-2 col-span-4 max-sm:border max-sm:col-span-3">
-            Produto
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Quantidade
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Preço unitário
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Preço médio da compra
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Lucro
-          </span>
-          <span className="flex items-center justify-center border-r-2 max-sm:border">
-            {" "}
-            Imposto (20%)
-          </span>
+        <div
+          className={`grid grid-cols-5 text-center max-sm:grid-cols-5 max-sm:text-xs`}
+        >
+          {header.map((item) => (
+            <span
+              key={item}
+              className="flex items-center justify-center border-r-2 max-sm:border"
+            >
+              {item}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -310,138 +382,42 @@ export default function Home() {
         </div>
       ) : (
         Object.entries(showedData)?.map(([key, month]) => {
-          const totalLucro = month.reduce((acc, item) => {
-            const lucro =
-              (item["Preço unitário"] - item["Média da compra"]) *
-              item["Quantidade"];
-
-            return acc + lucro;
-          }, 0);
-
           return (
             <div key={v4()}>
               <div className="flex items-center justify-center border-b-2 max-sm:sticky top-0 left-0 bg-black">
                 <h2 className="text-4xl text-center max-sm:text-3xl max-sm:my-4">
                   {key}
                 </h2>
-                <div className="flex text-3xl text-center ml-2 max-sm:text-base">
-                  (
-                  <h3
-                    className={`${
-                      totalLucro < 0 ? "text-red-400" : "text-green-400"
-                    } `}
-                  >
-                    {totalLucro.toFixed(2)}
-                  </h3>
-                  )
-                </div>
               </div>
 
               {month.map((item) => {
-                const lucro =
-                  (item["Preço unitário"] - item["Média da compra"]) *
-                  item["Quantidade"];
-
                 return (
                   <div
-                    className="grid grid-cols-11 text-center border-b border-dashed border-gray-700 
-                  last-of-type:border-solid last-of-type:border-b-2 last-of-type:border-white
-                  max-sm:grid-cols-6 max-sm:text-xs max-sm:border-white max-sm:border-solid max-sm:even:bg-zinc-500 max-sm:odd:bg-zinc-800 max-sm:border-y-2"
                     key={v4()}
+                    className="grid grid-cols-5 text-center border-b border-dashed border-gray-700 
+                    last-of-type:border-solid last-of-type:border-b-2 last-of-type:border-white
+                    max-sm:grid-cols-6 max-sm:text-xs max-sm:border-white max-sm:border-solid max-sm:even:bg-zinc-500 max-sm:odd:bg-zinc-800 max-sm:border-y-2"
                   >
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-1">
-                      <span className="w-full hidden max-sm:flex max-sm:items-center max-sm:justify-center max-sm:border-b max-sm:border-r max-sm:border-t break-words p-1 max-sm:h-14 max-sm:bg-black/40">
-                        Entrada / Saída
-                      </span>
-                      <span className="w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:p-5 max-sm:h-14">
-                        {item["Entrada/Saída"]}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Data
-                      </span>
-                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Data"]}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col col-span-4 max-sm:col-span-6 max-sm:-order-1">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t items-center justify-center border-r-2 col-span-4 max-sm:col-span-3 max-sm:h-14 max-sm:bg-black/40">
-                        Produto
-                      </span>
-                      <span className="w-full flex items-center justify-center col-span-4 text-left pl-1 border-white border-solid border-r-2 max-sm:col-span-3 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Produto"]}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Quantidade
-                      </span>
-                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Quantidade"]}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-1">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Preço unitário
-                      </span>
-                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Preço unitário"].toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Preço médio da compra
-                      </span>
-                      <span className="w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14">
-                        {item["Média da compra"].toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col max-sm:col-span-2">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Lucro
-                      </span>
-                      <span
-                        className={`w-full border-r-2 flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
-                          lucro < 0 ? "text-red-400" : "text-green-400"
-                        }`}
+                    {header.map((headerItem) => (
+                      <div
+                        key={v4()}
+                        className="flex items-center justify-between flex-col max-sm:col-span-1"
                       >
-                        {lucro.toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* ============================================================================================================================================================================================== */}
-
-                    <div className="flex items-center justify-between flex-col border border-dashed border-gray-700 max-sm:col-span-2">
-                      <span className="w-full hidden max-sm:flex max-sm:border-b max-sm:border-r max-sm:border-t p-1 items-center justify-center max-sm:h-14 max-sm:bg-black/40">
-                        Imposto (20%)
-                      </span>
-                      <span
-                        className={`w-full flex items-center justify-center max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${
-                          lucro < 0 ? "text-red-400" : "text-green-400"
-                        }`}
-                      >
-                        {(lucro * 0.2).toFixed(2)}
-                      </span>
-                    </div>
+                        <span
+                          className={`w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${getColor(
+                            item[headerItem as keyof IData],
+                            headerItem,
+                            item["Tipo"]
+                          )}`}
+                        >
+                          {formatValue(
+                            item[headerItem as keyof IData],
+                            headerItem,
+                            item["Tipo"]
+                          )}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 );
               })}
