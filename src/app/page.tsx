@@ -9,6 +9,7 @@ import { IData, IShowedData } from "@/types/data";
 import { UserContext } from "@/providers/firebase";
 import { Loading } from "@/components/loading";
 import { formatToDate } from "@/utils/formatToDate";
+import { LOCAL_STORAGE_KEY } from "@/constants/keys";
 
 const header = ["Data", "Estabelecimento", "Valor", "Parcela"];
 
@@ -42,27 +43,8 @@ export default function Home() {
           setData(json);
         };
         reader.readAsText(file);
-        console.log(reader);
       }
     }
-
-    // if (e.target.files) {
-    //   const reader = new FileReader();
-    //   reader.onload = (e: any) => {
-    //     const data = e.target.result;
-
-    //     const workbook = read(data, { type: "array" });
-
-    //     const sheetName = workbook.SheetNames[0];
-
-    //     const worksheet = workbook.Sheets[sheetName];
-
-    //     const json = utils.sheet_to_json(worksheet);
-
-    //     console.log({ json });
-    //   };
-    //   reader.readAsArrayBuffer(e.target.files[0]);
-    // }
   }, []);
 
   function csvJSON(csv?: string) {
@@ -85,6 +67,11 @@ export default function Home() {
       var currentLine = lines[i].split(isNu ? "," : ";");
 
       for (var j = 0; j < formattedHeaders.length; j++) {
+        if (!isNu)
+          obj[
+            "Identificador"
+          ] = `${currentLine[0]}-${currentLine[1]}-${currentLine[2]}-${currentLine[3]}-${currentLine[4]}`;
+
         obj[formattedHeaders[j]] = currentLine[j];
       }
       obj["Tipo"] = isNu ? "Nubank" : "Xp";
@@ -98,24 +85,40 @@ export default function Home() {
   const handleSaveJSON = async () => {
     setLoading(true);
     try {
-      const token = await user?.getIdToken();
-      if (!token) return;
+      // const token = await user?.getIdToken();
+      // if (!token) return;
 
-      const response = await fetch(`/api/save`, {
-        method: "POST",
-        body: JSON.stringify(file),
-        headers: {
-          Authorization: `${token}`,
-        },
-        credentials: "include",
+      // const response = await fetch(`/api/save`, {
+      //   method: "POST",
+      //   body: JSON.stringify(file),
+      //   headers: {
+      //     Authorization: `${token}`,
+      //   },
+      //   credentials: "include",
+      // });
+
+      // const { data } = await response.json();
+
+      // if (!data) return;
+
+      const dataString = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const data = dataString ? JSON.parse(dataString) : [];
+
+      const filteredData = file.filter((item: any) => {
+        return !data.some(
+          (obj: any) => obj["Identificador"] === item["Identificador"]
+        );
       });
 
-      const { data } = await response.json();
+      localStorage.setItem(
+        LOCAL_STORAGE_KEY,
+        JSON.stringify([...data, ...filteredData])
+      );
 
-      if (!data) return;
+      const newData = [...data, ...filteredData];
 
-      setData(data);
-      removeCreditDatas(data);
+      setData(newData);
+      removeCreditDatas(newData);
       setJson(null);
       setShowFileInput(false);
       fileRef.current!.value = "";
@@ -133,18 +136,19 @@ export default function Home() {
 
     setLoading(true);
     try {
-      const token = await user?.getIdToken();
-      if (!token) return;
+      // const token = await user?.getIdToken();
+      // if (!token) return;
 
-      const response = await fetch(`/api/delete`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `${token}`,
-        },
-        credentials: "include",
-      });
+      // const response = await fetch(`/api/delete`, {
+      //   method: "DELETE",
+      //   headers: {
+      //     Authorization: `${token}`,
+      //   },
+      //   credentials: "include",
+      // });
 
-      await response.json();
+      // await response.json();
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
 
       alert("Dados deletados com sucesso");
 
@@ -178,8 +182,10 @@ export default function Home() {
       // const { data } = await response.json();
 
       // if (!data) return;
+      const dataString = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const data = dataString ? JSON.parse(dataString) : [];
 
-      // setData(data);
+      setData(data);
       removeCreditDatas(data);
     } catch (error) {
       console.error("Error:", error);
@@ -199,11 +205,21 @@ export default function Home() {
         uniqueMap.set(monthKey, monthKey);
       });
 
+      data.sort((a, b) => {
+        const dateA = formatToDate(a);
+        const dateB = formatToDate(b);
+
+        console.log({ dateA, dateB, a, b });
+
+        return dateB.getTime() - dateA.getTime();
+      });
+
       const uniqueArray = Array.from(uniqueMap.values());
 
       setDateOptions(uniqueArray);
 
       const grouped = groupByMonths(data);
+
       setShowedData(grouped);
     } catch (error) {
       console.error("Error:", error);
@@ -299,8 +315,6 @@ export default function Home() {
   useEffect(() => {
     readJsonFile();
   }, []);
-
-  console.log({ showedData, data });
 
   return (
     <div>
