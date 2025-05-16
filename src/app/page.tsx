@@ -10,8 +10,9 @@ import { UserContext } from "@/providers/firebase";
 import { Loading } from "@/components/loading";
 import { formatToDate } from "@/utils/formatToDate";
 import { LOCAL_STORAGE_KEY } from "@/constants/keys";
+import Header from "@/components/layout/header";
 
-const header = ["Data", "Estabelecimento", "Valor", "Parcela"];
+const header = ["Estabelecimento", "Valor", "Data"];
 
 export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -105,8 +106,11 @@ export default function Home() {
       const data = dataString ? JSON.parse(dataString) : [];
 
       const filteredData = file.filter((item: any) => {
-        return !data.some(
-          (obj: any) => obj["Identificador"] === item["Identificador"]
+        return (
+          item["Estabelecimento"] !== "Pagamentos Validos Normais" &&
+          !data.some(
+            (obj: any) => obj["Identificador"] === item["Identificador"]
+          )
         );
       });
 
@@ -209,8 +213,6 @@ export default function Home() {
         const dateA = formatToDate(a);
         const dateB = formatToDate(b);
 
-        console.log({ dateA, dateB, a, b });
-
         return dateB.getTime() - dateA.getTime();
       });
 
@@ -302,14 +304,15 @@ export default function Home() {
           : Number(value.replace("R$ ", "").replace(".", "").replace(",", "."));
 
       if (banco === "Nubank") {
-        if (valueNumber > 0) return "text-green-500";
-        if (valueNumber < 0) return "text-red-500";
+        if (valueNumber > 0) return "text-green-600";
+        if (valueNumber < 0) return "text-red-600";
       }
 
       if (valueNumber < 0) return "text-green-500";
 
       return "text-red-500";
     }
+    return "text-blue-950";
   };
 
   useEffect(() => {
@@ -317,128 +320,139 @@ export default function Home() {
   }, []);
 
   return (
-    <div>
-      <div className="flex flex-col gap-5 p-2 my-3 ">
-        <button
-          className="w-36 rounded bg-slate-50 text-black p-2 br-2 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed "
-          onClick={() => setShowFileInput(!showFileInput)}
-        >
-          {showFileInput ? "Fechar" : "Enviar Arquivo"}
-        </button>
+    <div className="bg-neutral-200">
+      <Header />
+      <div className="flex max-w-6xl w-full flex-col m-auto">
+        {/* <div className="flex w-full flex-col gap-5 p-2 mt-20">
+          <button
+            className="w-36 rounded bg-slate-50 text-black p-2 br-2 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed "
+            onClick={() => setShowFileInput(!showFileInput)}
+          >
+            {showFileInput ? "Fechar" : "Enviar Arquivo"}
+          </button>
 
-        {showFileInput && (
-          <>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              ref={fileRef}
-            />
+          {showFileInput && (
+            <>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                ref={fileRef}
+              />
+              <button
+                disabled={!file}
+                className="w-36 rounded bg-green-300 text-black p-2 br-2 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed "
+                onClick={handleSaveJSON}
+              >
+                Enviar
+              </button>
+            </>
+          )}
+        </div> */}
+
+        {/* <div className="flex items-center justify-between gap-5 p-2 my-3 max-md:flex-col">
+          <div className="flex items-center gap-5 p-2 my-3 max-md:order-1">
+            <label htmlFor="data">Filtrar por data:</label>
+            <select className="text-black" id="data" onChange={onSelectChange}>
+              <option className="text-black">Todos</option>
+              {dateOptions?.map((item: any) => (
+                <option className="text-black" key={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-5 p-2 my-3 max-sm:flex-col">
             <button
-              disabled={!file}
-              className="w-36 rounded bg-green-300 text-black p-2 br-2 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed "
-              onClick={handleSaveJSON}
+              className="w-36 rounded bg-blue-300 text-black p-2 br-2 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed  max-sm:w-full"
+              onClick={readJsonFile}
             >
-              Enviar
+              Atualizar
             </button>
-          </>
+
+            <button
+              className="w-36 rounded bg-red-300 text-black p-2 br-2 hover:bg-red-300 max-sm:w-full"
+              onClick={handleDeleteJSON}
+            >
+              Deletar
+            </button>
+          </div>
+        </div> */}
+
+        <div className="sticky top-0 left-0 right-0 border max-sm:hidden py-3 mt-24 bg-neutral-200">
+          <div
+            className={`grid grid-cols-4 text-center max-sm:grid-cols-5 max-sm:text-xs`}
+          >
+            {header.map((item) => (
+              <span
+                key={item}
+                className={`flex ${
+                  item === "Estabelecimento"
+                    ? "col-span-2"
+                    : "col-span-1 justify-center"
+                } items-center border-r-2 max-sm:border text-zinc-400`}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="w-full h-60 flex items-center justify-center">
+            <Loading />
+          </div>
+        ) : (
+          Object.entries(showedData)?.map(([key, month]) => {
+            return (
+              <div key={v4()} className="gap-1 flex flex-col">
+                <div className="flex items-center justify-center text-zinc-400 py-4">
+                  <h2 className="text-base text-center">{key}</h2>
+                </div>
+
+                {month.map((item) => {
+                  return (
+                    <div
+                      key={v4()}
+                      className="grid grid-cols-4 text-center bg-white p-5 rounded-md "
+                    >
+                      {header.map((headerItem) => (
+                        <div
+                          key={v4()}
+                          className={`flex items-center justify-between flex-col ${
+                            headerItem === "Estabelecimento"
+                              ? "col-span-2"
+                              : "col-span-1"
+                          }`}
+                        >
+                          <span
+                            className={`w-full flex items-center capitalize ${
+                              headerItem === "Estabelecimento"
+                                ? ""
+                                : "justify-center"
+                            } border-r-2 ${getColor(
+                              item[headerItem as keyof IData],
+                              headerItem,
+                              item["Tipo"]
+                            )}`}
+                          >
+                            {formatValue(
+                              item[headerItem as keyof IData],
+                              headerItem,
+                              item["Tipo"]
+                            ).toLocaleLowerCase()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })
         )}
       </div>
-
-      <div className="flex items-center justify-between gap-5 p-2 my-3 max-md:flex-col">
-        <div className="flex items-center gap-5 p-2 my-3 max-md:order-1">
-          <label htmlFor="data">Filtrar por data:</label>
-          <select className="text-black" id="data" onChange={onSelectChange}>
-            <option className="text-black">Todos</option>
-            {dateOptions?.map((item: any) => (
-              <option className="text-black" key={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-5 p-2 my-3 max-sm:flex-col">
-          <button
-            className="w-36 rounded bg-blue-300 text-black p-2 br-2 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed  max-sm:w-full"
-            onClick={readJsonFile}
-          >
-            Atualizar
-          </button>
-
-          <button
-            className="w-36 rounded bg-red-300 text-black p-2 br-2 hover:bg-red-300 max-sm:w-full"
-            onClick={handleDeleteJSON}
-          >
-            Deletar
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-slate-800 sticky top-0 left-0 right-0 border max-sm:hidden ">
-        <div
-          className={`grid grid-cols-5 text-center max-sm:grid-cols-5 max-sm:text-xs`}
-        >
-          {header.map((item) => (
-            <span
-              key={item}
-              className="flex items-center justify-center border-r-2 max-sm:border"
-            >
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="w-full h-60 flex items-center justify-center">
-          <Loading />
-        </div>
-      ) : (
-        Object.entries(showedData)?.map(([key, month]) => {
-          return (
-            <div key={v4()}>
-              <div className="flex items-center justify-center border-b-2 max-sm:sticky top-0 left-0 bg-black">
-                <h2 className="text-4xl text-center max-sm:text-3xl max-sm:my-4">
-                  {key}
-                </h2>
-              </div>
-
-              {month.map((item) => {
-                return (
-                  <div
-                    key={v4()}
-                    className="grid grid-cols-5 text-center border-b border-dashed border-gray-700 
-                    last-of-type:border-solid last-of-type:border-b-2 last-of-type:border-white
-                    max-sm:grid-cols-6 max-sm:text-xs max-sm:border-white max-sm:border-solid max-sm:even:bg-zinc-500 max-sm:odd:bg-zinc-800 max-sm:border-y-2"
-                  >
-                    {header.map((headerItem) => (
-                      <div
-                        key={v4()}
-                        className="flex items-center justify-between flex-col max-sm:col-span-1"
-                      >
-                        <span
-                          className={`w-full flex items-center justify-center border-r-2 max-sm:border-r max-sm:border-dashed max-sm:border-gray-500 max-sm:h-14 ${getColor(
-                            item[headerItem as keyof IData],
-                            headerItem,
-                            item["Tipo"]
-                          )}`}
-                        >
-                          {formatValue(
-                            item[headerItem as keyof IData],
-                            headerItem,
-                            item["Tipo"]
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })
-      )}
     </div>
   );
 }
