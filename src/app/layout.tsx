@@ -3,6 +3,8 @@ import { Poppins } from "next/font/google";
 
 import "./globals.css";
 import FirebaseProvider from "@/providers/firebase";
+import Header from "@/components/layout/header";
+import CurrencyProvider from "@/providers/currency";
 
 const inter = Poppins({ subsets: ["latin"], weight: "400" });
 
@@ -19,7 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <FirebaseProvider>{children}</FirebaseProvider>
+        <CurrencyProvider>
+          <div className="bg-neutral-200 min-h-screen pb-4">
+            <Header />
+
+            <FirebaseProvider>{children}</FirebaseProvider>
+          </div>
+        </CurrencyProvider>
       </body>
     </html>
   );

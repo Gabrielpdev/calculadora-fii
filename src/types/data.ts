@@ -3,8 +3,15 @@ export interface IData {
   Estabelecimento: string;
   Parcela: string;
   Portador: string;
+  Categoria: string;
   Valor: string;
   Tipo: string;
+}
+export interface ICategory {
+  icon: string;
+  id: string;
+  list: string[];
+  name: string;
 }
 
 export interface IShowedData {
@@ -19,4 +26,12 @@ export interface IUpdateData {
 
 export interface IUserContext {
   user: any;
+}
+
+export interface ICurrencyContext {
+  value: {
+    in: string;
+    out: string;
+  };
+  setValue: (value: { in: string; out: string }) => void;
 }
