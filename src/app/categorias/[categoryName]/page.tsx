@@ -5,6 +5,7 @@ import { LOCAL_STORAGE_KEY } from "@/constants/keys";
 import { Loading } from "@/components/loading";
 import { useParams } from "next/navigation";
 import { ICategory } from "@/types/data";
+import { PiPlusCircleDuotone, PiTrashSimpleDuotone } from "react-icons/pi";
 
 export default function CategoryName() {
   const params = useParams();
@@ -88,8 +89,6 @@ export default function CategoryName() {
       return category;
     });
 
-    console.log(newCategories);
-
     localStorage.setItem(
       `${LOCAL_STORAGE_KEY}_categories`,
       JSON.stringify(newCategories)
@@ -112,18 +111,19 @@ export default function CategoryName() {
         </div>
       ) : (
         <div className={``}>
-          <div className={`grid grid-cols-5 m-2`}>
+          <div className={`grid grid-cols-10 m-2`}>
             <span
-              className={`w-full flex items-center capitalize border-r-2 text-blue-950 m-2 col-span-4`}
+              className={`w-full flex items-center capitalize border-r-2 text-blue-950 m-2 col-span-9`}
             >
               Nome
             </span>
             {!addField && (
               <button
                 onClick={() => setAddField(true)}
-                className="text-white bg-green-700 rounded-md my-3 py-2 font-extrabold"
+                className="flex items-center justify-center gap-2 text-white bg-green-700 rounded-md my-3 py-2 font-extrabold"
               >
                 Adicionar
+                <PiPlusCircleDuotone />
               </button>
             )}
           </div>
@@ -142,7 +142,7 @@ export default function CategoryName() {
                 type="submit"
                 className="text-white bg-green-700 rounded-md px-4 font-extrabold"
               >
-                Enviar
+                Salvar
               </button>
             </form>
           )}
@@ -151,19 +151,20 @@ export default function CategoryName() {
             {categoriesList.map((category) => (
               <div
                 key={category}
-                className="grid grid-cols-5 text-center bg-white p-5 rounded-md text-blue-950 "
+                className="grid grid-cols-10 text-center bg-white p-5 rounded-md text-blue-950 "
               >
                 <span
-                  className={`w-full flex capitalize col-span-4 border-r-2 `}
+                  className={`w-full flex capitalize col-span-9 border-r-2 `}
                 >
                   {category}
                 </span>
 
                 <button
                   onClick={() => handleDeleteValueOnList(category)}
-                  className="text-white bg-red-700 rounded-md px-4 font-extrabold"
+                  className="flex items-center justify-center gap-2 text-white bg-red-700 rounded-md px-4 font-extrabold"
                 >
                   Deletar
+                  <PiTrashSimpleDuotone />
                 </button>
               </div>
             ))}

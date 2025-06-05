@@ -1,38 +1,46 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import * as Icons from "react-icons/pi";
 
-import { IData } from "@/types/data";
 import { LOCAL_STORAGE_KEY } from "@/constants/keys";
 import { Loading } from "@/components/loading";
 import { v4 } from "uuid";
 import { useRouter } from "next/navigation";
+import { ICategory } from "@/types/data";
+import ListItem from "./components/ListItem";
 
 const mock = [
   {
     id: v4(),
     name: "Lanchonete",
-    icon: "hamburger",
+    icon: "PiHamburgerDuotone",
     list: ["Leo Lanches", "Baita Burger", "Jardel"],
   },
   {
     id: v4(),
     name: "Lazer",
-    icon: "casa",
+    icon: "PiConfettiDuotone",
     list: ["Leo Lanches", "Baita Burger", "Jardel"],
   },
   {
     id: v4(),
     name: "Outros",
-    icon: "other",
+    icon: "PiConfettiDuotone",
     list: ["Leo Lanches", "Baita Burger", "Jardel"],
   },
 ];
 
 export default function Category() {
   const { push } = useRouter();
-  const [categories, setCategories] = useState(mock);
+
+  const inputNameRef = useRef<HTMLInputElement>(null);
+  const inputIconRef = useRef<HTMLInputElement>(null);
+
+  const [categories, setCategories] = useState<ICategory[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isEditing, setIsEditing] = useState("");
 
   const readJsonFile = async () => {
     setLoading(true);
@@ -55,7 +63,7 @@ export default function Category() {
       );
       const categories = categoriesString ? JSON.parse(categoriesString) : [];
 
-      setCategories(mock);
+      setCategories(categories);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -63,8 +71,60 @@ export default function Category() {
     }
   };
 
-  const handleSelectCategory = (category: string) => {
-    push(`/categorias/${category.toLocaleLowerCase()}`);
+  const handleToggleEdit = (id: string) => {
+    if (isEditing === id) {
+      handleEditCategory(id);
+    }
+    setIsEditing(isEditing === id ? "" : id);
+  };
+
+  const handleSaveNewCategory = () => {
+    if (isAdding) {
+      if (inputNameRef?.current?.value && inputIconRef?.current?.value) {
+        const newCategory = {
+          id: v4(),
+          name: inputNameRef?.current?.value,
+          icon: inputIconRef?.current?.value,
+          list: [],
+        };
+
+        const newCategories = [...categories, newCategory];
+
+        localStorage.setItem(
+          `${LOCAL_STORAGE_KEY}_categories`,
+          JSON.stringify(newCategories)
+        );
+
+        setCategories(newCategories);
+        setIsEditing("");
+      }
+    }
+
+    setIsAdding(!isAdding);
+  };
+
+  const handleEditCategory = (id: string) => {
+    if (inputNameRef?.current?.value && inputIconRef?.current?.value) {
+      const newCategories = categories.map((category) => {
+        if (category.id === id) {
+          return {
+            ...category,
+            name: inputNameRef?.current?.value ?? category.name,
+            icon: inputIconRef?.current?.value ?? category.icon,
+          };
+        }
+
+        return category;
+      });
+
+      localStorage.setItem(
+        `${LOCAL_STORAGE_KEY}_categories`,
+        JSON.stringify(newCategories)
+      );
+
+      setCategories(newCategories);
+      setIsEditing("");
+    }
   };
 
   useEffect(() => {
@@ -79,36 +139,82 @@ export default function Category() {
         </div>
       ) : (
         <div className={``}>
-          <div className={`grid grid-cols-5 m-2`}>
+          <div className={`grid grid-cols-11 my-2`}>
             <span
-              className={`w-full flex items-center capitalize border-r-2 text-blue-950 m-2 col-span-4`}
+              className={`w-full flex items-center text-blue-950 m-2 col-span-9`}
             >
               Nome
             </span>
             <span
-              className={`w-full flex items-center justify-center capitalize border-r-2 text-blue-950 m-2 col-span-1`}
+              className={`w-full flex items-center justify-center text-blue-950`}
             >
               Icone
             </span>
+            <button
+              onClick={handleSaveNewCategory}
+              className="flex items-center justify-center gap-2 text-white bg-green-700 rounded-md my-3 p-2 text-sm font-extrabold"
+            >
+              {isAdding ? (
+                <>
+                  Salvar <Icons.PiCheckCircleDuotone />
+                </>
+              ) : (
+                <>
+                  Adicionar <Icons.PiPlusCircleDuotone />
+                </>
+              )}
+            </button>
           </div>
-          <div className="grid gap-2 ">
+
+          {isAdding && (
+            <form
+              onSubmit={handleSaveNewCategory}
+              className={`grid grid-cols-10 text-center bg-white p-5 rounded-md w-full mb-2`}
+            >
+              <input
+                ref={inputNameRef}
+                className={`w-full flex capitalize col-span-9 border-r-2 text-blue-950`}
+              />
+              <input
+                ref={inputIconRef}
+                className={`w-full flex items-center capitalize justify-center border-r-2 text-blue-950`}
+              />
+            </form>
+          )}
+          <div className="grid gap-4">
             {categories.map((category) => (
-              <button
-                onClick={() => handleSelectCategory(category.name)}
-                key={category.id}
-                className="grid grid-cols-5 text-center bg-white p-5 rounded-md "
-              >
-                <span
-                  className={`w-full flex capitalize col-span-4 border-r-2 text-blue-950`}
-                >
-                  {category.name}
-                </span>
-                <span
-                  className={`w-full flex items-center capitalize justify-center border-r-2 text-blue-950`}
-                >
-                  {category.icon}
-                </span>
-              </button>
+              <div className="grid grid-cols-12 gap-2" key={category.id}>
+                <ListItem
+                  className="col-span-11"
+                  category={category}
+                  isEditing={isEditing}
+                  inputIconRef={inputIconRef}
+                  inputNameRef={inputNameRef}
+                />
+                <div className="flex flex-col items-center justify-center gap-1 w-full">
+                  <button
+                    onClick={() => handleToggleEdit(category.id)}
+                    className="w-full flex items-center justify-center gap-2 text-white bg-yellow-600 rounded-md p-2 text-sm font-extrabold"
+                  >
+                    {isEditing === category.id ? (
+                      <>
+                        Salvar <Icons.PiCheckCircleDuotone />
+                      </>
+                    ) : (
+                      <>
+                        Editar <Icons.PiNotePencilDuotone />
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleToggleEdit(category.id)}
+                    className=" w-full flex items-center justify-center gap-2 text-white bg-red-600 rounded-md p-2 text-sm font-extrabold"
+                  >
+                    Deletar
+                    <Icons.PiTrashSimpleDuotone />
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>
